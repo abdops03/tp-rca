@@ -1,7 +1,7 @@
 from alice import Alice
 from bob import Bob
 from hacker1 import Hacker1
-
+from hacker2 import Hacker2
 # ==========================
 # 1. ALICE
 # ==========================
@@ -44,3 +44,12 @@ print("Message déchiffré :", message_dechiffre)
 hacker = Hacker1(public_key, cipher_list)
 
 hacker.attack()
+
+
+# ==========================
+# 5. HACKER 2
+# ==========================
+
+hacker2 = Hacker2(public_key, cipher_list)
+
+hacker2.attack()

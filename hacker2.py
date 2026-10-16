@@ -1,31 +1,74 @@
-import base64
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.backends import default_backend
+import time
+import math
 
-def dechiffrer_aes192_cbc(message_b64: str, cle: bytes, iv: bytes) -> str:
-    if len(cle) != 24:
-        raise ValueError(f"La clé doit faire exactement 24 octets (reçu : {len(cle)})")
-    if len(iv) != 16:
-        raise ValueError(f"L'IV doit faire exactement 16 octets (reçu : {len(iv)})")
 
-    donnees_chiffrees = base64.b64decode(message_b64)
-    cipher = Cipher(algorithms.AES(cle), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    donnees_paddes = decryptor.update(donnees_chiffrees) + decryptor.finalize()
+class Hacker2:
 
-    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-    donnees_claires = unpadder.update(donnees_paddes) + unpadder.finalize()
+    def __init__(self, public_key, cipher_list):
+        self.n, self.e = public_key
+        self.cipher_list = cipher_list
 
-    return donnees_claires.decode('utf-8')
+    def extended_gcd(self, a, b):
+        if b == 0:
+            return a, 1, 0
 
-if __name__ == "__main__":
-    # Remplace par tes vraies clés/messages du TP
-    CLE_24_OCTETS = b"123456789012345678901234"
-    IV_16_OCTETS  = b"1234567890123456"
-    MESSAGE_CHIFFRE_B64 = "TON_MESSAGE_BASE64"
+        gcd, x1, y1 = self.extended_gcd(b, a % b)
 
-    try:
-        print("Message déchiffré :", dechiffrer_aes192_cbc(MESSAGE_CHIFFRE_B64, CLE_24_OCTETS, IV_16_OCTETS))
-    except Exception as e:
-        print("Erreur :", e)
+        x = y1
+        y = x1 - (a // b) * y1
+
+        return gcd, x, y
+
+    def mod_inverse(self, e, phi_n):
+        gcd, x, _ = self.extended_gcd(e, phi_n)
+
+        if gcd != 1:
+            raise ValueError("Impossible de calculer l'inverse")
+
+        return x % phi_n
+
+    def attack(self):
+        print("\n=== HACKER 2 ===")
+        print("n =", self.n)
+        print("e =", self.e)
+
+        # 1. Factorisation
+        debut = time.perf_counter()
+
+        p = None
+        q = None
+
+        for i in range(2, math.isqrt(self.n) + 1):
+            if self.n % i == 0:
+                p = i
+                q = self.n // i
+                break
+
+        fin = time.perf_counter()
+
+        if p is None:
+            print("Impossible de factoriser n")
+            return
+
+        print("Facteur p =", p)
+        print("Facteur q =", q)
+        print("Temps de factorisation =", fin - debut, "secondes")
+
+        # 2. Calcul de phi(n)
+        phi_n = (p - 1) * (q - 1)
+
+        print("phi(n) =", phi_n)
+
+        # 3. Calcul de d
+        d = self.mod_inverse(self.e, phi_n)
+
+        print("d =", d)
+
+        # 4. Déchiffrement
+        message = ""
+
+        for cipher in self.cipher_list:
+            character = pow(cipher, d, self.n)
+            message += chr(character)
+
+        print("Message retrouvé :", message)
