@@ -1,15 +1,15 @@
 
+import numpy as np
 from itertools import product as combinaisons
 from reed_solomon import redond, syndromes
 
 
 def texte_vers_bits(texte):
-    """Convertit chaque caractère en une suite de 8 bits."""
+    """Convertit chaque caractère en 8 bits."""
     bits = []
     for caractere in texte:
         bits.extend(
-            int(bit)
-            for bit in format(ord(caractere), "08b")
+            int(bit) for bit in format(ord(caractere), "08b")
         )
     return bits
 
@@ -37,10 +37,10 @@ def encoder_bloc(symboles):
 
 
 def encoder_texte(texte):
-    """Convertit le texte et encode les blocs de 3 symboles."""
+    """Encode le texte par blocs de 3 symboles utiles."""
     bits = texte_vers_bits(texte)
 
-    # Un bloc utile contient 9 bits.
+    # Complète jusqu'à obtenir un nombre de bits multiple de 9.
     while len(bits) % 9 != 0:
         bits.append(0)
 
@@ -54,15 +54,21 @@ def encoder_texte(texte):
     return blocs_codes
 
 
-def ajouter_bruit(symbole):
-    """Inverse volontairement le premier bit d'un symbole."""
-    symbole_errone = symbole.copy()
-    symbole_errone[0] = 1 - int(symbole_errone[0])
-    return symbole_errone
+def noise(a, p=0.01):
+    """Ajoute du bruit aléatoire à un symbole de 3 bits."""
+    c = []
+
+    for bit in a:
+        if np.random.uniform() < p:
+            c.append(1 - int(bit))
+        else:
+            c.append(int(bit))
+
+    return c
 
 
 def calculer_syndromes(bloc):
-    """Calcule les 4 syndromes d'un bloc de 7 symboles."""
+    """Calcule les syndromes d'un bloc de 7 symboles."""
     if len(bloc) != 7:
         raise ValueError(
             "Un bloc transmis doit contenir 7 symboles."
@@ -73,7 +79,7 @@ def calculer_syndromes(bloc):
 
 
 def syndromes_nuls(bloc):
-    """Vérifie si les quatre syndromes sont nuls."""
+    """Vérifie si tous les syndromes sont nuls."""
     resultats = calculer_syndromes(bloc)
 
     return all(
@@ -108,13 +114,10 @@ def decoder_texte(blocs_corriges, longueur_originale):
     bits = []
 
     for bloc in blocs_corriges:
-        # Les trois premiers symboles contiennent les données utiles.
         for symbole in bloc[:3]:
             bits.extend(int(bit) for bit in symbole)
 
-    # Retire les bits de remplissage ajoutés pendant l'encodage.
     bits = bits[:longueur_originale * 8]
-
     texte = ""
 
     for i in range(0, len(bits), 8):
@@ -140,32 +143,32 @@ if __name__ == "__main__":
         print("Redondance      :", bloc[3:])
         print("Bloc transmis   :", bloc)
 
-        # Vérification du bloc sans erreur.
-        resultat = calculer_syndromes(bloc)
-        print("Syndromes sans erreur :", resultat)
+        print(
+            "Syndromes sans erreur :",
+            calculer_syndromes(bloc)
+        )
 
-        # Copie du bloc pour simuler une erreur.
-        bloc_recu = [symbole.copy() for symbole in bloc]
-
-        # Test : ajoute une erreur au premier symbole.
-        bloc_recu[0] = ajouter_bruit(bloc_recu[0])
+        # Simule le bruit sur les 7 symboles transmis.
+        bloc_recu = [
+            noise(symbole, p=0.01)
+            for symbole in bloc
+        ]
 
         print("Bloc reçu avec bruit :", bloc_recu)
 
-        # Calcul des syndromes après l'erreur.
-        resultat_erreur = calculer_syndromes(bloc_recu)
-        print("Syndromes avec erreur :", resultat_erreur)
+        print(
+            "Syndromes avec erreur :",
+            calculer_syndromes(bloc_recu)
+        )
 
-        # Recherche de la correction.
         bloc_corrige, position = corriger_une_erreur(bloc_recu)
 
         if bloc_corrige is not None:
             blocs_corriges.append(bloc_corrige)
-
             print("Bloc corrigé :", bloc_corrige)
 
             if position is not None:
-                print("Symbole corrigé, position :", position)
+                print("Position corrigée :", position)
             else:
                 print("Aucune erreur détectée.")
 
@@ -176,7 +179,6 @@ if __name__ == "__main__":
         else:
             print("Aucune correction trouvée.")
 
-    # Reconstruit le texte seulement si tous les blocs ont été corrigés.
     if len(blocs_corriges) == len(blocs):
         texte_decode = decoder_texte(
             blocs_corriges,
@@ -185,3 +187,8 @@ if __name__ == "__main__":
 
         print("\nTexte original :", texte)
         print("Texte décodé   :", texte_decode)
+    else:
+        print(
+            "\nDécodage incomplet : au moins un bloc "
+            "n'a pas pu être corrigé."
+        )
